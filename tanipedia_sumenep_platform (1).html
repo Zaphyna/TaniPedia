@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaniPedia Sumenep - Platform Edukasi & Direktori Pertanian</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#287A46',
+                        'primary-dark': '#185C35',
+                        secondary: '#A5C98C',
+                        background: '#F7F9F5',
+                        surface: '#FFFFFF',
+                        darktext: '#26352B',
+                        muted: '#788579',
+                        accent: '#E8B957',
+                        bordercolor: '#E5EBE3',
+                    },
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- React & ReactDOM CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #F7F9F5;
+            color: #26352B;
+        }
+        #map {
+            height: 480px;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+        .leaflet-popup-content-wrapper {
+            border-radius: 0.75rem;
+            padding: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #F1F5F9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col selection:bg-primary selection:text-white">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- DATA AWAL KIOS PERTANIAN SUMENEP ---
+        const INITIAL_KIOSKS = [
+            {
+                id: 'kiosk-1',
+                name: 'Toko Pertanian UD. MURNI AGRO',
+                district: 'Lenteng',
+                address: 'Kompleks Pasar Lenteng, Desa Lenteng Timur, Kec. Lenteng, Kabupaten Sumenep',
+                phone: '082301379051',
+                whatsapp: '6282301379051',
+                operating_hours: '07:00 - 17:00 WIB',
+                lat: -6.9925,
+                lng: 113.7820,
+                verification_status: 'verified',
+                is_subsidized_distributor: true,
+                photograph: 'https://images.unsplash.com/photo-1589923188900-85dae523342b?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Urea': { status: 'available', updated: '2 Jam lalu', type: 'Subsidised' },
+                    'NPK Phonska': { status: 'available', updated: '2 Jam lalu', type: 'Subsidised' },
+                    'ZA': { status: 'limited', updated: 'Yesterday', type: 'Subsidised' },
+                    'Pupuk Organik': { status: 'available', updated: '1 Hari lalu', type: 'Non-Subsidised' },
+                    'Benih Jagung Bisi 18': { status: 'available', updated: '3 Jam lalu', type: 'Seed' },
+                    'Pestisida Insektisida': { status: 'available', updated: 'Hari ini', type: 'Chemical' }
+                }
+            },
+            {
+                id: 'kiosk-2',
+                name: 'Toko Pertanian MADUTANI',
+                district: 'Lenteng',
+                address: 'Jalan Flamboyan No. 12, Kec. Lenteng, Kabupaten Sumenep',
+                phone: '081359090099',
+                whatsapp: '6281359090099',
+                operating_hours: '07:30 - 16:30 WIB',
+                lat: -6.9938,
+                lng: 113.7852,
+                verification_status: 'verified',
+                is_subsidized_distributor: false,
+                photograph: 'https://images.unsplash.com/photo-1605000797499-95a51c5269ae?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'NPK Non-Subsidi (Yaramila)': { status: 'available', updated: 'Hari ini', type: 'Non-Subsidised' },
+                    'Benih Bawang Rubaru': { status: 'available', updated: '4 Jam lalu', type: 'Seed' },
+                    'Pupuk Kasut / Organik': { status: 'available', updated: 'Kemarin', type: 'Non-Subsidised' },
+                    'Fungisida Antrakol': { status: 'available', updated: 'Hari ini', type: 'Chemical' }
+                }
+            },
+            {
+                id: 'kiosk-3',
+                name: 'KIOS PUPUK BERSUBSIDI UD. RAYYAN',
+                district: 'Gapura',
+                address: 'Jl. Raya Gapura, Desa Gapura Barat, Kec. Gapura, Kabupaten Sumenep',
+                phone: '085231456789',
+                whatsapp: '6285231456789',
+                operating_hours: '07:00 - 16:00 WIB',
+                lat: -6.9650,
+                lng: 113.9780,
+                verification_status: 'verified',
+                is_subsidized_distributor: true,
+                photograph: 'https://images.unsplash.com/photo-1595974482597-4b8da8879bc5?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Urea': { status: 'available', updated: '1 Hari lalu', type: 'Subsidised' },
+                    'NPK Phonska': { status: 'limited', updated: '1 Hari lalu', type: 'Subsidised' },
+                    'ZA': { status: 'out_of_stock', updated: '3 Hari lalu', type: 'Subsidised' }
+                }
+            },
+            {
+                id: 'kiosk-4',
+                name: 'Toko Pertanian Lingkar Jaya',
+                district: 'Batuan',
+                address: 'Jl. Lingkar Barat, Kec. Batuan, Kabupaten Sumenep',
+                phone: '081938221144',
+                whatsapp: '6281938221144',
+                operating_hours: '08:00 - 17:00 WIB',
+                lat: -6.9950,
+                lng: 113.8420,
+                verification_status: 'verified',
+                is_subsidized_distributor: false,
+                photograph: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Benih Padi Ciherang': { status: 'available', updated: '5 Jam lalu', type: 'Seed' },
+                    'Benih Cabai Rawit': { status: 'available', updated: 'Hari ini', type: 'Seed' },
+                    'Pupuk Cair Organik': { status: 'available', updated: '2 Hari lalu', type: 'Non-Subsidised' }
+                }
+            },
+            {
+                id: 'kiosk-5',
+                name: 'Kios Pupuk UD Usaha Mulya',
+                district: 'Rubaru',
+                address: 'Desa Karangnangka, Kec. Rubaru, Kabupaten Sumenep',
+                phone: '087750987123',
+                whatsapp: '6287750987123',
+                operating_hours: '07:00 - 16:00 WIB',
+                lat: -6.9420,
+                lng: 113.7910,
+                verification_status: 'verified',
+                is_subsidized_distributor: true,
+                photograph: 'https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Bibit Bawang Merah Rubaru': { status: 'available', updated: 'Hari ini', type: 'Seed' },
+                    'NPK Phonska': { status: 'available', updated: '6 Jam lalu', type: 'Subsidised' },
+                    'Urea': { status: 'available', updated: '6 Jam lalu', type: 'Subsidised' }
+                }
+            },
+            {
+                id: 'kiosk-6',
+                name: 'UD. Cahaya Tani Ganding',
+                district: 'Ganding',
+                address: 'Desa Ketawang Larangan, Kec. Ganding, Kabupaten Sumenep',
+                phone: '082334112233',
+                whatsapp: '6282334112233',
+                operating_hours: '07:30 - 16:30 WIB',
+                lat: -6.9730,
+                lng: 113.7310,
+                verification_status: 'verified',
+                is_subsidized_distributor: true,
+                photograph: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Urea': { status: 'available', updated: 'Yesterday', type: 'Subsidised' },
+                    'Pupuk Organik Granul': { status: 'available', updated: 'Yesterday', type: 'Non-Subsidised' }
+                }
+            },
+            {
+                id: 'kiosk-7',
+                name: 'CV. Tani Makmur Sumenep',
+                district: 'Kota Sumenep',
+                address: 'Desa Pamolokan, Kec. Kota Sumenep, Kabupaten Sumenep',
+                phone: '081230998877',
+                whatsapp: '6281230998877',
+                operating_hours: '08:00 - 18:00 WIB',
+                lat: -6.9790,
+                lng: 113.8640,
+                verification_status: 'verified',
+                is_subsidized_distributor: false,
+                photograph: 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Pestisida Lengkap': { status: 'available', updated: 'Hari ini', type: 'Chemical' },
+                    'Alat Semprot Hama (Sprayer)': { status: 'available', updated: 'Hari ini', type: 'Tools' },
+                    'Benih Tembakau Madura': { status: 'available', updated: '3 Hari lalu', type: 'Seed' }
+                }
+            },
+            {
+                id: 'kiosk-8',
+                name: 'UD Ardila Tani',
+                district: 'Kota Sumenep',
+                address: 'Desa Parsanga, Kec. Kota Sumenep, Kabupaten Sumenep',
+                phone: '085330112244',
+                whatsapp: '6285330112244',
+                operating_hours: '07:00 - 17:00 WIB',
+                lat: -6.9720,
+                lng: 113.8820,
+                verification_status: 'verified',
+                is_subsidized_distributor: true,
+                photograph: 'https://images.unsplash.com/photo-1574943320219-553eb213f72d?auto=format&fit=crop&w=800&q=80',
+                stocks: {
+                    'Urea': { status: 'available', updated: '4 Jam lalu', type: 'Subsidised' },
+                    'NPK Phonska': { status: 'available', updated: '4 Jam lalu', type: 'Subsidised' }
+                }
+            }
+        ];
+
+        // --- DATA ARTIKEL EDUKASI PERTANIAN ---
+        const EDUCATIONAL_ARTICLES = [
+            {
+                id: 'art-1',
+                title: 'Panduan Budidaya Bawang Merah Varietas Rubaru khas Sumenep',
+                slug: 'budidaya-bawang-merah-rubaru',
+                category: 'Hortikultura',
+                readTime: '6 menit',
+                thumbnail: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cf?auto=format&fit=crop&w=800&q=80',
+                excerpt: 'Varietas Bawang Merah Rubaru terkenal sangat tahan terhadap penyakit layu Fusarium dan cocok untuk kondisi iklim kering Madura.',
+                publishedAt: '10 November 2026',
+                author: 'Tim Penyuluh Pertanian Sumenep',
+                content: `Bawang Merah Varietas Rubaru merupakan salah satu komoditas hortikultura unggulan nasional asal Kabupaten Sumenep. Keunggulan utamanya adalah ketahanan yang tinggi terhadap serangan penyakit moler (Layu Fusarium) serta adaptif di lahan kering.
+
+1. Pengolahan Lahan:
+- Buat bedengan dengan lebar 100-120 cm, tinggi 30-40 cm, dan jarak antar bedengan 40 cm.
+- Berikan kapur pertanian (Dolomit) jika pH tanah di bawah 6.0.
+- Tambahkan pupuk kandang matang sebanyak 10-15 ton/ha.
+
+2. Pemilihan Benih:
+- Gunakan umbi bibit berukuran sedang (5-8 gram) yang telah disimpan 2-3 bulan.
+- Pastikan umbi segar, tidak cacat, dan bebas dari spora jamur.
+
+3. Pengaturan Irigasi:
+- Penyiraman dilakukan 2 kali sehari (pagi dan sore) pada 2 minggu pertama.
+- Kurangi frekuensi penyiraman saat memasuki fase pematangan umbi (umur 50 HST).`,
+                references: 'Dinas Ketahanan Pangan dan Pertanian Kabupaten Sumenep (2024).'
+            },
+            {
+                id: 'art-2',
+                title: 'Strategi Pemupukan Berimbang Tanaman Jagung di Lahan Dryland Sumenep',
+                slug: 'pemupukan-jagung-lahan-kering',
+                category: 'Pemupukan',
+                readTime: '5 menit',
+                thumbnail: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80',
+                excerpt: 'Ketahui dosis tepat gabungan Urea dan NPK Phonska untuk memaksimalkan tongkol jagung Madura tanpa merusak struktur tanah.',
+                publishedAt: '02 November 2026',
+                author: 'Ir. H. Achmad Fauzi, M.Si',
+                content: `Jagung merupakan tanaman pangan prioritas di Kabupaten Sumenep. Penggunaan dosis pupuk yang presisi sangat menentukan efisiensi biaya dan hasil panen per hektar.
+
+Fase Pemupukan:
+1. Pemupukan Dasar (7-10 HST): Berikan NPK Phonska 150 kg/ha + Pupuk Organik 2 ton/ha.
+2. Pemupukan Susulan I (21-25 HST): Berikan Urea 100 kg/ha ditugal 5 cm di samping batang.
+3. Pemupukan Susulan II (40-45 HST): Berikan NPK Phonska 100 kg/ha + Urea 50 kg/ha jelang fase pembungaan.`,
+                references: 'Balai Penerapan Standar Instrumen Pertanian (BPSIP) Jawa Timur.'
+            },
+            {
+                id: 'art-3',
+                title: 'Teknik Pengendalian Hama Ugray / Uter pada Tanaman Padi Sawah',
+                slug: 'pengendalian-hama-uter-padi',
+                category: 'Pengendalian Hama dan Penyakit',
+                readTime: '4 menit',
+                thumbnail: 'https://images.unsplash.com/photo-1530507629858-e4977d30e9e0?auto=format&fit=crop&w=800&q=80',
+                excerpt: 'Langkah pencegahan dini terpadu mengendalikan hama penggerek batang dan ugray secara ramah lingkungan.',
+                publishedAt: '28 Oktober 2026',
+                author: 'Dr. Endang S., SP',
+                content: `Pengendalian Hama Terpadu (PHT) mengutamakan sanitasi lingkungan sawah dan penggunaan musuh alami sebelum aplikasi agen hayati atau kimiawi.`,
+                references: 'Jurnal Perlindungan Tanaman Tropis Indonesia.'
+            },
+            {
+                id: 'art-4',
+                title: 'Potensi Cabai Jamu (Cabai Jawa) Komoditas Rempah Unggulan Ekspor Sumenep',
+                slug: 'potensi-cabai-jamu-sumenep',
+                category: 'Tanaman Pangan',
+                readTime: '7 menit',
+                thumbnail: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=800&q=80',
+                excerpt: 'Sumenep merupakan produsen utama cabai jamu di Indonesia. Simak syarat tumbuh dan pengolahan pascapanen kualitas super.',
+                publishedAt: '15 Oktober 2026',
+                author: 'Tim Peneliti Pertanian Madura',
+                content: `Cabai jamu (*Piper retrofractum Vahl*) membutuhkan tiang panjat (panjatan hidup seperti tiang kelor atau lamtoro) dan naungan sedang. Pengeringan hingga kadar air < 10% kunci kualitas mutu ekspor.`,
+                references: 'Badan Riset dan Inovasi Nasional (BRIN) Pertanian.'
+            }
+        ];
+
+        // --- DATA REKOMENDASI TANAMAN ---
+        const CROPS_RECOMMENDATION = [
+            {
+                id: 'crop-1',
+                name: 'Bawang Merah (Rubaru)',
+                scientificName: 'Allium cepa var. aggregatum',
+                category: 'Hortikultura',
+                soilType: 'Mediteran & Aluvial',
+                waterReq: 'Sedang (Irigasi Teratur)',
+                duration: '55 - 65 Hari',
+                image: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cf?auto=format&fit=crop&w=800&q=80',
+                description: 'Sangat cocok untuk daerah Rubaru, Pasongsongan, Dasuk, dan sekitarnya. Tahan penyakit bercak daun dan moler.',
+                bestPlantingTime: 'Musim Kemarau / Akhir Musim Hujan (Mei - Agustus)',
+                enemies: 'Layu Fusarium (Moler), Ulat Grayak (Spodoptera exigua), Thrips',
+                fertilizerAdvice: 'NPK Phonska 300kg/ha + ZA 150kg/ha + Pupuk Kandang 10 Ton/ha',
+                seedPrice: 'Rp 35.000 - Rp 50.000 / kg bibit umbi',
+                sellingPrice: 'Rp 20.000 - Rp 35.000 / kg umbi segar (hingga Rp 45.000 saat pasokan terbatas)'
+            },
+            {
+                id: 'crop-2',
+                name: 'Jagung Hibrida / Madura',
+                scientificName: 'Zea mays L.',
+                category: 'Tanaman Pangan',
+                soilType: 'Berpasir & Lempung Kering',
+                waterReq: 'Rendah - Tadah Hujan',
+                duration: '85 - 105 Hari',
+                image: 'https://images.unsplash.com/photo-1551754655-cd27e38d2076?auto=format&fit=crop&w=800&q=80',
+                description: 'Tanaman pangan utama lahan tegalan di Kabupaten Sumenep. Tahan cuaca panas dan efisien pemanfaatan air.',
+                bestPlantingTime: 'Awal Musim Hujan (November - Dember) & Musim Tanam II (Maret - April)',
+                enemies: 'Ulat Grayak Frugiperda (FAW), Penggerek Batang Jagung, Buluk (Downy Mildew)',
+                fertilizerAdvice: 'Urea 200kg/ha + NPK Phonska 250kg/ha',
+                seedPrice: 'Rp 85.000 - Rp 110.000 / kg benih hibrida',
+                sellingPrice: 'Rp 4.500 - Rp 5.800 / kg jagung pipilan kering panen'
+            },
+            {
+                id: 'crop-3',
+                name: 'Cabai Jamu (Cabai Jawa)',
+                scientificName: 'Piper retrofractum Vahl',
+                category: 'Perkebunan & Rempah',
+                soilType: 'Lempung Berpasir pH 5.5 - 6.5',
+                waterReq: 'Sedang',
+                duration: 'Tanaman Menahun (Panen mulai 1 tahun)',
+                image: 'https://images.unsplash.com/photo-1509316975850-ff9c5deb0cd9?auto=format&fit=crop&w=800&q=80',
+                description: 'Tanaman berdaya jual tinggi dengan pangsa pasar industri jamu dan ekspor. Cocok untuk Bluto, Saronggi, dan Lenteng.',
+                bestPlantingTime: 'Awal Musim Hujan (Oktober - November) agar perakaran kuat',
+                enemies: 'Antraknosa (Bercak Buah), Hama Thrips, Busuk Akar Phytophthora',
+                fertilizerAdvice: 'Pupuk Organik Matang 5kg/pohon/tahun + NPK 100g/pohon',
+                seedPrice: 'Rp 7.500 - Rp 15.000 / polybag bibit',
+                sellingPrice: 'Rp 45.000 - Rp 85.000 / kg cabai jamu kering'
+            },
+            {
+                id: 'crop-4',
+                name: 'Padi Sawah Irigasi',
+                scientificName: 'Oryza sativa',
+                category: 'Tanaman Pangan',
+                soilType: 'Liat Berdebu / Aluvial',
+                waterReq: 'Tinggi (Tergenang Terkontrol)',
+                duration: '105 - 120 Hari',
+                image: 'https://images.unsplash.com/photo-1530507629858-e4977d30e9e0?auto=format&fit=crop&w=800&q=80',
+                description: 'Cocok ditanam di dataran aluvial Lenteng, Batuan, dan Kota Sumenep pada musim hujan atau daerah irigasi teknis.',
+                bestPlantingTime: 'Musim Hujan I (November - Februari) & Musim Tanam II (Maret - Juni)',
+                enemies: 'Penggerek Batang (Sundep/Beluk), Wereng Batang Cokelat (WBC), Tikus Sawah',
+                fertilizerAdvice: 'Urea 250kg/ha + NPK Phonska 300kg/ha + Organik 2 Ton/ha',
+                seedPrice: 'Rp 12.000 - Rp 18.000 / kg benih bersertifikat',
+                sellingPrice: 'Rp 6.200 - Rp 7.500 / kg Gabah Kering Panen (GKP)'
+            }
+        ];
+
+        // --- POPUP MODAL KOMODITAS DETAIL ---
+        function CropDetailModal({ crop, onClose }) {
+            if (!crop) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="bg-surface rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-bordercolor shadow-2xl p-6 sm:p-8 space-y-6 relative custom-scrollbar">
+                        <button 
+                            onClick={onClose}
+                            className="absolute top-5 right-5 w-9 h-9 rounded-full bg-background border border-bordercolor flex items-center justify-center text-darktext hover:bg-red-50 hover:text-red-600 transition-all font-bold text-sm"
+                        >
+                            ✕
+                        </button>
+
+                        <div className="flex items-start space-x-4 pr-8">
+                            <img src={crop.image} alt={crop.name} className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-2xl flex-shrink-0" />
+                            <div>
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100">
+                                    {crop.category}
+                                </span>
+                                <h2 className="text-xl sm:text-2xl font-extrabold text-darktext mt-1">{crop.name}</h2>
+                                <p className="text-xs italic text-muted">{crop.scientificName}</p>
+                                <p className="text-xs text-darktext mt-2 font-medium">Estimasi Masa Panen: <strong className="text-primary">{crop.duration}</strong></p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4 text-xs">
+                            <div className="bg-background p-4 rounded-2xl border border-bordercolor space-y-1">
+                                <span className="font-bold text-primary uppercase tracking-wider text-[11px] block">📖 Penjelasan Komoditas:</span>
+                                <p className="text-darktext leading-relaxed">{crop.description}</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/60 space-y-1">
+                                    <span className="font-bold text-amber-900 uppercase tracking-wider text-[11px] block">🗓️ Waktu Terbaik Menanam:</span>
+                                    <p className="text-amber-950 font-semibold leading-relaxed">{crop.bestPlantingTime}</p>
+                                </div>
+
+                                <div className="bg-red-50/60 p-4 rounded-2xl border border-red-200/60 space-y-1">
+                                    <span className="font-bold text-red-900 uppercase tracking-wider text-[11px] block">🐛 Musuh / Hama & Penyakit Utama:</span>
+                                    <p className="text-red-950 font-semibold leading-relaxed">{crop.enemies}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-200/60 space-y-1">
+                                <span className="font-bold text-emerald-900 uppercase tracking-wider text-[11px] block">🌱 Kebutuhan Pupuk & Dosis:</span>
+                                <p className="text-emerald-950 font-semibold leading-relaxed">{crop.fertilizerAdvice}</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-blue-50/60 p-4 rounded-2xl border border-blue-200/60 space-y-1">
+                                    <span className="font-bold text-blue-900 uppercase tracking-wider text-[11px] block">🏷️ Perkiraan Harga Bibit:</span>
+                                    <p className="text-blue-950 font-bold leading-relaxed">{crop.seedPrice}</p>
+                                </div>
+
+                                <div className="bg-purple-50/60 p-4 rounded-2xl border border-purple-200/60 space-y-1">
+                                    <span className="font-bold text-purple-900 uppercase tracking-wider text-[11px] block">💰 Perkiraan Harga Jual Panen:</span>
+                                    <p className="text-purple-950 font-bold leading-relaxed">{crop.sellingPrice}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 flex justify-end">
+                            <button 
+                                onClick={onClose}
+                                className="bg-primary hover:bg-primary-dark text-white font-bold text-xs px-6 py-2.5 rounded-xl transition-all shadow-sm"
+                            >
+                                Tutup Informasi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- MAIN APP COMPONENT ---
+        function App() {
+            const [activeTab, setActiveTab] = useState('home');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [selectedDistrict, setSelectedDistrict] = useState('All');
+            const [kiosks, setKiosks] = useState(INITIAL_KIOSKS);
+            const [selectedKiosk, setSelectedKiosk] = useState(null);
+            const [selectedArticle, setSelectedArticle] = useState(null);
+            const [selectedCropModal, setSelectedCropModal] = useState(null);
+            
+            // Community state
+            const [contributions, setContributions] = useState([
+                {
+                    id: 'c1',
+                    author: 'Pak Hassan (Petani Lenteng)',
+                    title: 'Tips Mengatasi Ulat Grayak pada Bawang Merah',
+                    category: 'Pengalaman Budidaya',
+                    date: '11 Nov 2026',
+                    status: 'approved',
+                    content: 'Gunakan campuran ekstrak daun mimba dan serai wangi disemprotkan sore hari saat ulat mulai aktif keluar.'
+                }
+            ]);
+            const [newContribution, setNewContribution] = useState({ author: '', title: '', category: 'Budidaya', content: '' });
+            const [toastMessage, setToastMessage] = useState(null);
+
+            // Filter Kiosks
+            const filteredKiosks = useMemo(() => {
+                return kiosks.filter(kiosk => {
+                    const matchDistrict = selectedDistrict === 'All' || kiosk.district === selectedDistrict;
+                    const matchSearch = kiosk.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        kiosk.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        kiosk.district.toLowerCase().includes(searchQuery.toLowerCase());
+                    return matchDistrict && matchSearch;
+                });
+            }, [kiosks, selectedDistrict, searchQuery]);
+
+            const showToast = (msg) => {
+                setToastMessage(msg);
+                setTimeout(() => setToastMessage(null), 4000);
+            };
+
+            const handleAddContribution = (e) => {
+                e.preventDefault();
+                if (!newContribution.author || !newContribution.title || !newContribution.content) {
+                    showToast('Harap isi semua kolom formulir kontribusi.');
+                    return;
+                }
+                const created = {
+                    id: 'c-' + Date.now(),
+                    ...newContribution,
+                    date: 'Hari ini',
+                    status: 'pending'
+                };
+                setContributions([created, ...contributions]);
+                setNewContribution({ author: '', title: '', category: 'Budidaya', content: '' });
+                showToast('Terima kasih! Kontribusi Anda telah dikirim untuk ditinjau admin.');
+            };
+
+            return (
+                <div className="flex-1 flex flex-col min-h-screen">
+                    {/* TOAST NOTIFICATION */}
+                    {toastMessage && (
+                        <div className="fixed bottom-5 right-5 z-50 bg-primary text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300">
+                            <i data-lucide="check-circle" class="w-5 h-5"></i>
+                            <span className="font-medium text-sm">{toastMessage}</span>
+                        </div>
+                    )}
+
+                    {/* POPUP MODAL DETAIL KOMODITAS */}
+                    <CropDetailModal crop={selectedCropModal} onClose={() => setSelectedCropModal(null)} />
+
+                    {/* NAVBAR */}
+                    <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur-md border-b border-bordercolor shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex items-center justify-between h-20">
+                                {/* Logo & Brand */}
+                                <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('home')}>
+                                    <div className="w-11 h-11 bg-primary rounded-xl flex items-center justify-center text-white shadow-md shadow-primary/20">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-2xl font-extrabold tracking-tight text-primary">TaniPedia</span>
+                                        </div>
+                                        <p className="text-xs text-muted font-medium">Kabupaten Sumenep, Jawa Timur</p>
+                                    </div>
+                                </div>
+
+                                {/* Desktop Navigation */}
+                                <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+                                    {[
+                                        { id: 'home', label: 'Beranda' },
+                                        { id: 'education', label: 'Edukasi Pertanian' },
+                                        { id: 'recommendation', label: 'Rekomendasi Budidaya' },
+                                        { id: 'kiosks', label: 'Direktori & Peta Kios' },
+                                        { id: 'community', label: 'Komunitas' },
+                                        { id: 'dashboard', label: 'Dashboard Pemilik/Admin' }
+                                    ].map(item => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => { setActiveTab(item.id); setSelectedKiosk(null); setSelectedArticle(null); }}
+                                            className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-150 ${
+                                                activeTab === item.id 
+                                                    ? 'bg-primary text-white shadow-sm' 
+                                                    : 'text-darktext hover:bg-background hover:text-primary'
+                                            }`}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </nav>
+
+                                {/* Emergency / Contact Button (Pak Musaheri) */}
+                                <div className="hidden lg:flex items-center space-x-2">
+                                    <a 
+                                        href="https://wa.me/6282336037572?text=Halo%20Pak%20Musaheri%20(Bidang%20Penyuluhan%20Pertanian),%20saya%20ingin%20konsultasi%20seputar%20pertanian"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center space-x-2 bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 px-3.5 py-2 rounded-lg text-xs font-bold transition-all"
+                                        title="Hubungi Pak Musaheri - Bidang Penyuluhan Pertanian (082336037572)"
+                                    >
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        <span>Bantuan Pertanian (Pak Musaheri)</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mobile Navigation Tabs Bar */}
+                        <div className="md:hidden flex overflow-x-auto border-t border-bordercolor px-2 py-2 space-x-2 custom-scrollbar bg-surface">
+                            {[
+                                { id: 'home', label: 'Beranda' },
+                                { id: 'education', label: 'Edukasi' },
+                                { id: 'recommendation', label: 'Rekomendasi' },
+                                { id: 'kiosks', label: 'Peta Kios' },
+                                { id: 'community', label: 'Komunitas' },
+                                { id: 'dashboard', label: 'Dashboard' }
+                            ].map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => { setActiveTab(item.id); setSelectedKiosk(null); setSelectedArticle(null); }}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${
+                                        activeTab === item.id ? 'bg-primary text-white' : 'bg-background text-darktext'
+                                    }`}
+                                >
+                                    {item.label}
+                                </button>
+                            ))}
+                        </div>
+                    </header>
+
+                    {/* MAIN CONTENT ROUTING */}
+                    <main className="flex-1">
+                        {activeTab === 'home' && (
+                            <HomeView 
+                                setActiveTab={setActiveTab} 
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                setSelectedArticle={setSelectedArticle}
+                                setSelectedKiosk={setSelectedKiosk}
+                                setSelectedCropModal={setSelectedCropModal}
+                                kiosks={kiosks}
+                            />
+                        )}
+
+                        {activeTab === 'education' && (
+                            <EducationView 
+                                selectedArticle={selectedArticle}
+                                setSelectedArticle={setSelectedArticle}
+                            />
+                        )}
+
+                        {activeTab === 'recommendation' && (
+                            <RecommendationView setSelectedCropModal={setSelectedCropModal} />
+                        )}
+
+                        {activeTab === 'kiosks' && (
+                            <KioskDirectoryView 
+                                kiosks={filteredKiosks}
+                                allKiosks={kiosks}
+                                selectedDistrict={selectedDistrict}
+                                setSelectedDistrict={setSelectedDistrict}
+                                searchQuery={searchQuery}
+                                setSearchQuery={setSearchQuery}
+                                selectedKiosk={selectedKiosk}
+                                setSelectedKiosk={setSelectedKiosk}
+                            />
+                        )}
+
+                        {activeTab === 'community' && (
+                            <CommunityView 
+                                contributions={contributions}
+                                newContribution={newContribution}
+                                setNewContribution={setNewContribution}
+                                handleAddContribution={handleAddContribution}
+                            />
+                        )}
+
+                        {activeTab === 'dashboard' && (
+                            <DashboardView 
+                                kiosks={kiosks}
+                                setKiosks={setKiosks}
+                                showToast={showToast}
+                            />
+                        )}
+                    </main>
+
+                    {/* FOOTER */}
+                    <footer className="bg-darktext text-white border-t border-emerald-950 mt-16">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                                <div className="space-y-4">
+                                    <div className="flex items-center space-x-2">
+                                        <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                            </svg>
+                                        </div>
+                                        <span className="text-xl font-bold tracking-tight text-white">TaniPedia Sumenep</span>
+                                    </div>
+                                    <p className="text-xs text-gray-300 leading-relaxed">
+                                        Platform digital independen untuk pelayanan edukasi pertanian, peta ketersediaan pupuk & benih, serta panduan budidaya ramah lingkungan khusus Kabupaten Sumenep.
+                                    </p>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-sm font-bold text-accent uppercase tracking-wider mb-4">Navigasi Utama</h4>
+                                    <ul className="space-y-2 text-xs text-gray-300">
+                                        <li><button onClick={() => setActiveTab('education')} className="hover:text-white">Artikel & Panduan Edukasi</button></li>
+                                        <li><button onClick={() => setActiveTab('recommendation')} className="hover:text-white">Sistem Rekomendasi Tanaman</button></li>
+                                        <li><button onClick={() => setActiveTab('kiosks')} className="hover:text-white">Direktori & Peta Kios Pertanian</button></li>
+                                        <li><button onClick={() => setActiveTab('community')} className="hover:text-white">Forum Kontribusi Petani</button></li>
+                                    </ul>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-sm font-bold text-accent uppercase tracking-wider mb-4">Kecamatan Sumenep</h4>
+                                    <div className="grid grid-cols-2 gap-1 text-xs text-gray-400">
+                                        <span>• Lenteng</span>
+                                        <span>• Rubaru</span>
+                                        <span>• Gapura</span>
+                                        <span>• Ganding</span>
+                                        <span>• Batuan</span>
+                                        <span>• Kota Sumenep</span>
+                                        <span>• Pasongsongan</span>
+                                        <span>• Ambunten</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <h4 className="text-sm font-bold text-accent uppercase tracking-wider mb-4">Catatan Legal & Batasan</h4>
+                                    <p className="text-xs text-gray-400 leading-relaxed">
+                                        TaniPedia merupakan inisiatif independen penyebaran edukasi pertanian dan katalog informasi kios. Bukan sistem resmi pemerintah dan bukan pengganti sistem alokasi pupuk bersubsidi resmi (e-RDKK).
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-emerald-900 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-400">
+                                <p>© 2026 TaniPedia Kabupaten Sumenep. All rights reserved.</p>
+                                <p className="mt-2 sm:mt-0 font-medium text-emerald-400">Didesain khusus untuk Petani & Masyarakat Sumenep, Madura</p>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        // --- SECTION: HOME VIEW ---
+        function HomeView({ setActiveTab, searchQuery, setSearchQuery, setSelectedArticle, setSelectedKiosk, setSelectedCropModal, kiosks }) {
+            return (
+                <div className="space-y-12 pb-12">
+                    {/* HERO SECTION */}
+                    <section className="relative bg-gradient-to-r from-emerald-900 via-primary-dark to-primary text-white py-20 px-4 sm:px-6 lg:px-8 overflow-hidden rounded-b-3xl shadow-lg">
+                        <div className="absolute inset-0 opacity-15 bg-[url('https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&w=1600&q=80')] bg-cover bg-center"></div>
+                        <div className="relative max-w-5xl mx-auto text-center space-y-6">
+                            <span className="inline-block bg-accent text-darktext text-xs font-extrabold px-3.5 py-1.5 rounded-full uppercase tracking-wider shadow-sm">
+                                Portal Pertanian Terpadu Sumenep
+                            </span>
+                            <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
+                                Majukan Pertanian Sumenep dengan Informasi Tepat & Presisi
+                            </h1>
+                            <p className="text-sm sm:text-lg text-emerald-100 max-w-3xl mx-auto leading-relaxed">
+                                Temukan lokasi kios pupuk & benih terdekat di kecamatan Anda, peta interaktif dengan navigasi langsung Google Maps, panduan budidaya varietas lokal, serta rekomendasi pemupukan berimbang.
+                            </p>
+
+                            {/* SEARCH BAR */}
+                            <div className="max-w-2xl mx-auto pt-4">
+                                <div className="bg-surface p-2 rounded-2xl shadow-2xl flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 border border-emerald-200">
+                                    <div className="flex-1 flex items-center px-3 w-full">
+                                        <svg className="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                        <input 
+                                            type="text" 
+                                            placeholder="Cari kios, pupuk, atau komoditas (misal: Lenteng, Urea, Bawang Rubaru)..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') setActiveTab('kiosks'); }}
+                                            className="w-full text-darktext text-sm focus:outline-none py-2 bg-transparent"
+                                        />
+                                    </div>
+                                    <button 
+                                        onClick={() => setActiveTab('kiosks')}
+                                        className="w-full sm:w-auto bg-primary hover:bg-primary-dark text-white text-sm font-bold px-6 py-3 rounded-xl transition-all shadow-md"
+                                    >
+                                        Cari Kios & Peta
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* QUICK ACCESS BUTTONS */}
+                    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[
+                                { title: 'Edukasi Pertanian', desc: 'Artikel & Panduan Hama', tab: 'education', color: 'bg-emerald-50 text-primary border-emerald-200', icon: 'book-open' },
+                                { title: 'Rekomendasi Tanaman', desc: 'Kesesuaian Tanah & Dosis', tab: 'recommendation', color: 'bg-amber-50 text-amber-800 border-amber-200', icon: 'sprout' },
+                                { title: 'Cari Kios & Peta', desc: 'Ketersediaan Stok Pupuk', tab: 'kiosks', color: 'bg-blue-50 text-blue-800 border-blue-200', icon: 'map-pin' },
+                                { title: 'Forum Komunitas', desc: 'Tanya Jawab & Pengalaman', tab: 'community', color: 'bg-purple-50 text-purple-800 border-purple-200', icon: 'users' }
+                            ].map((item, idx) => (
+                                <div 
+                                    key={idx}
+                                    onClick={() => setActiveTab(item.tab)}
+                                    className={`p-5 rounded-2xl border ${item.color} cursor-pointer hover:shadow-lg transition-all duration-200 transform hover:-translate-y-1 flex flex-col justify-between`}
+                                >
+                                    <div>
+                                        <div className="font-extrabold text-base sm:text-lg">{item.title}</div>
+                                        <p className="text-xs opacity-80 mt-1 font-medium">{item.desc}</p>
+                                    </div>
+                                    <div className="mt-4 flex items-center text-xs font-bold space-x-1">
+                                        <span>Buka Modul</span>
+                                        <span>→</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* FEATURED PLANTS OF SUMENEP */}
+                    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-extrabold text-darktext tracking-tight">Komoditas Unggulan Sumenep</h2>
+                                <p className="text-xs text-muted">Klik tanaman untuk melihat info detail budidaya, waktu tanam, musuh, harga bibit & harga jual</p>
+                            </div>
+                            <button onClick={() => setActiveTab('recommendation')} className="text-xs font-bold text-primary hover:underline mt-2 sm:mt-0">
+                                Lihat Semua Rekomendasi Budidaya →
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            {CROPS_RECOMMENDATION.map(crop => (
+                                <div 
+                                    key={crop.id} 
+                                    onClick={() => setSelectedCropModal(crop)}
+                                    className="bg-surface rounded-2xl border border-bordercolor overflow-hidden shadow-sm hover:shadow-xl hover:border-primary cursor-pointer transition-all duration-200 transform hover:-translate-y-1 flex flex-col"
+                                >
+                                    <img src={crop.image} alt={crop.name} className="h-40 w-full object-cover" />
+                                    <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                                        <div>
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary bg-emerald-50 px-2.5 py-0.5 rounded-md border border-emerald-100">
+                                                {crop.category}
+                                            </span>
+                                            <h3 className="text-base font-bold text-darktext mt-1 group-hover:text-primary">{crop.name}</h3>
+                                            <p className="text-xs italic text-muted">{crop.scientificName}</p>
+                                            <p className="text-xs text-muted mt-2 line-clamp-2">{crop.description}</p>
+                                        </div>
+                                        <div className="pt-2 border-t border-bordercolor flex items-center justify-between text-xs text-primary font-bold">
+                                            <span>Lihat Detail Lengkap</span>
+                                            <span>→</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+
+                    {/* NEARBY KIOSKS PREVIEW & MAP HIGHLIGHT */}
+                    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+                        <div className="bg-surface rounded-3xl p-6 sm:p-8 border border-bordercolor shadow-sm space-y-6">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between">
+                                <div>
+                                    <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase">Peta Direktori Real</span>
+                                    <h2 className="text-2xl font-extrabold text-darktext mt-2">Kios Pertanian Terdaftar di Sumenep</h2>
+                                    <p className="text-xs text-muted">Dapatkan rute langsung ke lokasi kios via Google Maps</p>
+                                </div>
+                                <button 
+                                    onClick={() => setActiveTab('kiosks')}
+                                    className="mt-4 md:mt-0 bg-primary text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-primary-dark transition-all shadow-sm"
+                                >
+                                    Buka Peta Interaktif Penuh
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                {kiosks.slice(0, 3).map(kiosk => (
+                                    <div key={kiosk.id} className="bg-background rounded-2xl p-4 border border-bordercolor flex flex-col justify-between space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-primary bg-white px-2.5 py-1 rounded-lg border border-bordercolor">{kiosk.district}</span>
+                                                {kiosk.is_subsidized_distributor && (
+                                                    <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded">Resmi Bersubsidi</span>
+                                                )}
+                                            </div>
+                                            <h3 className="font-bold text-sm text-darktext leading-snug">{kiosk.name}</h3>
+                                            <p className="text-xs text-muted line-clamp-2">{kiosk.address}</p>
+                                        </div>
+
+                                        <div className="space-y-2 pt-2 border-t border-bordercolor">
+                                            <div className="flex items-center justify-between text-xs">
+                                                <span className="text-muted">Status Stok Urea:</span>
+                                                <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Tersedia</span>
+                                            </div>
+
+                                            {/* Google Maps Direct Navigation Button */}
+                                            <a 
+                                                href={`https://www.google.com/maps/dir/?api=1&destination=${kiosk.lat},${kiosk.lng}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full bg-white hover:bg-emerald-50 text-primary border border-emerald-300 font-bold text-xs py-2 rounded-xl flex items-center justify-center space-x-1.5 transition-all shadow-xs"
+                                            >
+                                                <svg className="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                                </svg>
+                                                <span>Buka Rute Google Maps</span>
+                                            </a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* FEATURED ARTICLES PREVIEW */}
+                    <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-extrabold text-darktext tracking-tight">Edukasi & Artikel Terbaru</h2>
+                                <p className="text-xs text-muted">Pengetahuan teknis penyuluhan untuk hasil pertanian optimal</p>
+                            </div>
+                            <button onClick={() => setActiveTab('education')} className="text-xs font-bold text-primary hover:underline">
+                                Lihat Semua Artikel →
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {EDUCATIONAL_ARTICLES.slice(0, 2).map(article => (
+                                <div 
+                                    key={article.id}
+                                    onClick={() => { setSelectedArticle(article); setActiveTab('education'); }}
+                                    className="bg-surface rounded-2xl border border-bordercolor overflow-hidden p-5 flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 cursor-pointer hover:shadow-md transition-all"
+                                >
+                                    <img src={article.thumbnail} alt={article.title} className="h-36 sm:h-auto sm:w-40 object-cover rounded-xl" />
+                                    <div className="flex-1 flex flex-col justify-between space-y-2">
+                                        <div>
+                                            <div className="flex items-center space-x-2 text-[10px] font-bold text-primary">
+                                                <span className="bg-emerald-50 px-2 py-0.5 rounded">{article.category}</span>
+                                                <span>•</span>
+                                                <span>{article.readTime}</span>
+                                            </div>
+                                            <h3 className="font-bold text-base text-darktext leading-snug mt-1 hover:text-primary transition-colors">
+                                                {article.title}
+                                            </h3>
+                                            <p className="text-xs text-muted mt-1 line-clamp-2">{article.excerpt}</p>
+                                        </div>
+                                        <div className="text-[11px] text-muted font-medium pt-2 border-t border-bordercolor">
+                                            {article.publishedAt} — oleh {article.author}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                </div>
+            );
+        }
+
+        // --- SECTION: EDUCATION MODULE VIEW ---
+        function EducationView({ selectedArticle, setSelectedArticle }) {
+            const [selectedCategory, setSelectedCategory] = useState('Semua');
+            const [searchFilter, setSearchFilter] = useState('');
+
+            const categories = ['Semua', 'Hortikultura', 'Pemupukan', 'Pengendalian Hama dan Penyakit', 'Tanaman Pangan'];
+
+            const filteredArticles = EDUCATIONAL_ARTICLES.filter(art => {
+                const matchCat = selectedCategory === 'Semua' || art.category === selectedCategory;
+                const matchSearch = art.title.toLowerCase().includes(searchFilter.toLowerCase()) || 
+                                    art.content.toLowerCase().includes(searchFilter.toLowerCase());
+                return matchCat && matchSearch;
+            });
+
+            if (selectedArticle) {
+                return (
+                    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+                        <button 
+                            onClick={() => setSelectedArticle(null)}
+                            className="inline-flex items-center space-x-2 text-xs font-bold text-primary bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200 hover:bg-emerald-100 transition-all"
+                        >
+                            <span>← Kembali ke Daftar Artikel</span>
+                        </button>
+
+                        <div className="bg-surface rounded-3xl p-6 sm:p-10 border border-bordercolor shadow-sm space-y-6">
+                            <div className="space-y-3">
+                                <span className="bg-emerald-100 text-primary text-xs font-extrabold px-3 py-1 rounded-full uppercase">
+                                    {selectedArticle.category}
+                                </span>
+                                <h1 className="text-2xl sm:text-4xl font-extrabold text-darktext leading-tight">
+                                    {selectedArticle.title}
+                                </h1>
+                                <div className="flex flex-wrap items-center gap-4 text-xs text-muted border-b border-bordercolor pb-4">
+                                    <span>Penulis: <strong>{selectedArticle.author}</strong></span>
+                                    <span>•</span>
+                                    <span>Tanggal: <strong>{selectedArticle.publishedAt}</strong></span>
+                                    <span>•</span>
+                                    <span>Waktu Baca: <strong>{selectedArticle.readTime}</strong></span>
+                                </div>
+                            </div>
+
+                            <img src={selectedArticle.thumbnail} alt={selectedArticle.title} className="w-full h-80 object-cover rounded-2xl" />
+
+                            <div className="prose max-w-none text-darktext text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-line font-normal">
+                                {selectedArticle.content}
+                            </div>
+
+                            {selectedArticle.references && (
+                                <div className="bg-background rounded-2xl p-4 border border-bordercolor text-xs text-muted space-y-1 mt-8">
+                                    <span className="font-bold text-darktext">Sumber Referensi Akademis/Resmi:</span>
+                                    <p>{selectedArticle.references}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-darktext tracking-tight">Modul Edukasi Pertanian Sumenep</h1>
+                        <p className="text-sm text-muted mt-1">Materi ilmiah teruji, rekomendasi penyuluhan, dan petunjuk teknis bercocok tanam.</p>
+                    </div>
+
+                    {/* SEARCH & FILTER */}
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-surface p-4 rounded-2xl border border-bordercolor">
+                        <div className="w-full md:w-auto flex overflow-x-auto space-x-2 custom-scrollbar pb-2 md:pb-0">
+                            {categories.map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setSelectedCategory(cat)}
+                                    className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                                        selectedCategory === cat 
+                                            ? 'bg-primary text-white shadow-xs' 
+                                            : 'bg-background text-muted hover:text-darktext'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+
+                        <input 
+                            type="text" 
+                            placeholder="Cari artikel..." 
+                            value={searchFilter}
+                            onChange={(e) => setSearchFilter(e.target.value)}
+                            className="w-full md:w-64 px-4 py-2 text-xs bg-background rounded-xl border border-bordercolor focus:outline-none focus:border-primary"
+                        />
+                    </div>
+
+                    {/* ARTICLES GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {filteredArticles.map(article => (
+                            <div 
+                                key={article.id}
+                                onClick={() => setSelectedArticle(article)}
+                                className="bg-surface rounded-2xl border border-bordercolor overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+                            >
+                                <div>
+                                    <img src={article.thumbnail} alt={article.title} className="h-48 w-full object-cover" />
+                                    <div className="p-5 space-y-3">
+                                        <div className="flex items-center justify-between text-[11px] font-bold">
+                                            <span className="text-primary bg-emerald-50 px-2 py-0.5 rounded">{article.category}</span>
+                                            <span className="text-muted">{article.readTime}</span>
+                                        </div>
+                                        <h3 className="font-bold text-base text-darktext leading-snug hover:text-primary transition-colors">
+                                            {article.title}
+                                        </h3>
+                                        <p className="text-xs text-muted line-clamp-3 leading-relaxed">{article.excerpt}</p>
+                                    </div>
+                                </div>
+
+                                <div className="p-5 pt-0 border-t border-bordercolor text-[11px] text-muted flex items-center justify-between">
+                                    <span>{article.publishedAt}</span>
+                                    <span className="font-bold text-primary">Baca Artikel →</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+
+        // --- SECTION: RECOMMENDATION ENGINE VIEW ---
+        function RecommendationView({ setSelectedCropModal }) {
+            const [soilFilter, setSoilFilter] = useState('All');
+            const [waterFilter, setWaterFilter] = useState('All');
+
+            const filteredCrops = CROPS_RECOMMENDATION.filter(crop => {
+                const matchSoil = soilFilter === 'All' || crop.soilType.toLowerCase().includes(soilFilter.toLowerCase());
+                const matchWater = waterFilter === 'All' || crop.waterReq.toLowerCase().includes(waterFilter.toLowerCase());
+                return matchSoil && matchWater;
+            });
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-darktext tracking-tight">Rekomendasi Budidaya Tanaman Presisi</h1>
+                        <p className="text-sm text-muted mt-1">Sistem pencocokan karakteristik lahan, ketersediaan air, dan formula pemupukan di Kabupaten Sumenep.</p>
+                    </div>
+
+                    {/* FILTER TOOLBAR */}
+                    <div className="bg-surface p-6 rounded-3xl border border-bordercolor shadow-sm grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-darktext uppercase tracking-wider">Karakteristik Jenis Tanah / Lahan:</label>
+                            <select 
+                                value={soilFilter} 
+                                onChange={(e) => setSoilFilter(e.target.value)}
+                                className="w-full bg-background border border-bordercolor rounded-xl p-3 text-xs font-bold text-darktext focus:outline-none focus:border-primary"
+                            >
+                                <option value="All">Semua Jenis Lahan di Sumenep</option>
+                                <option value="Mediteran">Lahan Kering Mediteran (Rubaru, Dasuk, Pasongsongan)</option>
+                                <option value="Berpasir">Lahan Berpasir / Tegalan (Guluk-Guluk, Ganding)</option>
+                                <option value="Aluvial">Lahan Aluvial Sawah (Lenteng, Batuan, Kota Sumenep)</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-darktext uppercase tracking-wider">Ketersediaan Pasokan Air:</label>
+                            <select 
+                                value={waterFilter} 
+                                onChange={(e) => setWaterFilter(e.target.value)}
+                                className="w-full bg-background border border-bordercolor rounded-xl p-3 text-xs font-bold text-darktext focus:outline-none focus:border-primary"
+                            >
+                                <option value="All">Semua Sumber Air</option>
+                                <option value="Tadah Hujan">Lahan Tegalan / Tadah Hujan (Musim Hujan Only)</option>
+                                <option value="Irigasi">Irigasi Teknis / Sumur Bor Pompa Air</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* RECOMMENDATION RESULTS */}
+                    <div className="space-y-6">
+                        <h2 className="text-xl font-bold text-darktext">Komoditas Direkomendasikan ({filteredCrops.length})</h2>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {filteredCrops.map(crop => (
+                                <div 
+                                    key={crop.id} 
+                                    onClick={() => setSelectedCropModal(crop)}
+                                    className="bg-surface rounded-3xl border border-bordercolor p-6 shadow-sm hover:shadow-lg hover:border-primary transition-all cursor-pointer space-y-4 flex flex-col justify-between"
+                                >
+                                    <div className="space-y-4">
+                                        <div className="flex items-start space-x-4">
+                                            <img src={crop.image} alt={crop.name} className="w-24 h-24 object-cover rounded-2xl flex-shrink-0" />
+                                            <div>
+                                                <span className="text-[10px] font-extrabold uppercase text-primary bg-emerald-50 px-2.5 py-1 rounded-md">
+                                                    {crop.category}
+                                                </span>
+                                                <h3 className="text-lg font-bold text-darktext mt-1">{crop.name}</h3>
+                                                <p className="text-xs italic text-muted">{crop.scientificName}</p>
+                                                <p className="text-xs text-muted mt-2">{crop.description}</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 text-xs bg-background p-3.5 rounded-2xl border border-bordercolor">
+                                            <div>
+                                                <span className="text-muted block">Jenis Tanah:</span>
+                                                <strong className="text-darktext">{crop.soilType}</strong>
+                                            </div>
+                                            <div>
+                                                <span className="text-muted block">Kebutuhan Air:</span>
+                                                <strong className="text-darktext">{crop.waterReq}</strong>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-emerald-50/60 p-4 rounded-2xl border border-emerald-100 space-y-1">
+                                            <div className="flex items-center space-x-2 text-xs font-bold text-primary">
+                                                <i data-lucide="check-circle" class="w-4 h-4"></i>
+                                                <span>Klik untuk Rincian Waktu Tanam, Hama, Harga Bibit & Jual →</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- SECTION: KIOSK DIRECTORY & INTERACTIVE MAP VIEW ---
+        function KioskDirectoryView({ kiosks, allKiosks, selectedDistrict, setSelectedDistrict, searchQuery, setSearchQuery, selectedKiosk, setSelectedKiosk }) {
+            const mapRef = useRef(null);
+            const leafletMap = useRef(null);
+            const markersRef = useRef({});
+
+            const districts = ['All', 'Lenteng', 'Gapura', 'Batuan', 'Rubaru', 'Ganding', 'Kota Sumenep'];
+
+            // Initialize Leaflet Map
+            useEffect(() => {
+                if (!mapRef.current) return;
+                
+                if (!leafletMap.current) {
+                    // Center at Sumenep Alun-Alun (-6.9841, 113.8672)
+                    leafletMap.current = L.map(mapRef.current).setView([-6.9750, 113.8400], 11);
+                    
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    }).addTo(leafletMap.current);
+                }
+
+                // Clear previous markers
+                Object.values(markersRef.current).forEach(marker => marker.remove());
+                markersRef.current = {};
+
+                // Add current filtered kiosk markers
+                kiosks.forEach(kiosk => {
+                    const customIcon = L.divIcon({
+                        className: 'custom-leaflet-marker',
+                        html: `<div style="background-color: #287A46; width: 28px; height: 28px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 10px;">🏪</div>`,
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14]
+                    });
+
+                    const marker = L.marker([kiosk.lat, kiosk.lng], { icon: customIcon })
+                        .addTo(leafletMap.current)
+                        .bindPopup(`
+                            <div style="font-family: sans-serif; width: 220px; text-align: left;">
+                                <img src="${kiosk.photograph}" style="width: 100%; height: 90px; object-fit: cover; border-radius: 6px; margin-bottom: 6px;"/>
+                                <strong style="font-size: 13px; color: #26352B; display: block; margin-bottom: 2px;">${kiosk.name}</strong>
+                                <span style="font-size: 11px; color: #788579; display: block; margin-bottom: 8px;">${kiosk.address}</span>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${kiosk.lat},${kiosk.lng}" target="_blank" style="display: inline-block; width: 100%; text-align: center; background-color: #287A46; color: white; padding: 6px 0; border-radius: 6px; font-size: 11px; font-weight: bold; text-decoration: none;">
+                                    Navigasi Google Maps →
+                                </a>
+                            </div>
+                        `);
+
+                    marker.on('click', () => {
+                        setSelectedKiosk(kiosk);
+                    });
+
+                    markersRef.current[kiosk.id] = marker;
+                });
+            }, [kiosks]);
+
+            // Fly to kiosk when selected
+            useEffect(() => {
+                if (selectedKiosk && leafletMap.current) {
+                    leafletMap.current.flyTo([selectedKiosk.lat, selectedKiosk.lng], 14, { duration: 1.5 });
+                    if (markersRef.current[selectedKiosk.id]) {
+                        markersRef.current[selectedKiosk.id].openPopup();
+                    }
+                }
+            }, [selectedKiosk]);
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-darktext tracking-tight">Direktori & Peta Kios Pertanian Sumenep</h1>
+                        <p className="text-sm text-muted mt-1">Cari kios ketersediaan benih dan pupuk di kecamatan Anda dengan tautan rute Google Maps langsung.</p>
+                    </div>
+
+                    {/* SEARCH & DISTRICT FILTER */}
+                    <div className="bg-surface p-4 rounded-3xl border border-bordercolor shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="w-full md:w-auto flex items-center space-x-2 overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+                            <span className="text-xs font-bold text-muted whitespace-nowrap mr-2">Kecamatan:</span>
+                            {districts.map(dist => (
+                                <button
+                                    key={dist}
+                                    onClick={() => setSelectedDistrict(dist)}
+                                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                                        selectedDistrict === dist 
+                                            ? 'bg-primary text-white shadow-xs' 
+                                            : 'bg-background text-muted hover:text-darktext'
+                                    }`}
+                                >
+                                    {dist === 'All' ? 'Semua Kecamatan' : dist}
+                                </button>
+                            ))}
+                        </div>
+
+                        <input 
+                            type="text"
+                            placeholder="Cari nama toko / jalan..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full md:w-72 bg-background border border-bordercolor px-4 py-2 rounded-xl text-xs focus:outline-none focus:border-primary"
+                        />
+                    </div>
+
+                    {/* INTERACTIVE LEAFLET MAP CONTAINER */}
+                    <div className="bg-surface p-4 rounded-3xl border border-bordercolor shadow-sm space-y-3">
+                        <div className="flex items-center justify-between px-2">
+                            <div className="flex items-center space-x-2">
+                                <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span className="text-xs font-bold text-darktext">Peta Interaktif Lokasi Kios (OpenStreetMap / Google Direct Navigation)</span>
+                            </div>
+                            <span className="text-[11px] text-muted">Klik penanda untuk info detail & rute</span>
+                        </div>
+                        
+                        <div id="map" ref={mapRef}></div>
+                    </div>
+
+                    {/* KIOSK CARDS GRID */}
+                    <div className="space-y-4">
+                        <h2 className="text-xl font-bold text-darktext">Daftar Kios Pertanian ({kiosks.length})</h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {kiosks.map(kiosk => (
+                                <div 
+                                    key={kiosk.id}
+                                    className={`bg-surface rounded-3xl border overflow-hidden transition-all flex flex-col justify-between ${
+                                        selectedKiosk?.id === kiosk.id ? 'border-primary ring-2 ring-primary/20 shadow-md' : 'border-bordercolor shadow-sm hover:shadow-md'
+                                    }`}
+                                >
+                                    <div>
+                                        <div className="relative h-44 bg-gray-100">
+                                            <img src={kiosk.photograph} alt={kiosk.name} className="w-full h-full object-cover" />
+                                            <div className="absolute top-3 left-3 bg-surface/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-primary">
+                                                {kiosk.district}
+                                            </div>
+                                            {kiosk.is_subsidized_distributor && (
+                                                <div className="absolute top-3 right-3 bg-amber-500 text-white px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase shadow-sm">
+                                                    Penyalur Bersubsidi
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="p-5 space-y-3">
+                                            <h3 className="font-bold text-base text-darktext leading-tight">{kiosk.name}</h3>
+                                            <p className="text-xs text-muted leading-relaxed">{kiosk.address}</p>
+                                            
+                                            <div className="text-xs text-darktext font-medium space-y-1 bg-background p-3 rounded-xl border border-bordercolor">
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted">Jam Operasional:</span>
+                                                    <strong className="text-darktext">{kiosk.operating_hours}</strong>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted">Kontak HP/WA:</span>
+                                                    <strong className="text-primary">{kiosk.phone || 'Tersedia'}</strong>
+                                                </div>
+                                            </div>
+
+                                            {/* STOCKS PREVIEW */}
+                                            <div className="space-y-1">
+                                                <span className="text-[11px] font-bold text-muted uppercase tracking-wider">Status Ketersediaan Stok:</span>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {Object.entries(kiosk.stocks).slice(0, 3).map(([item, detail]) => (
+                                                        <span key={item} className="text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                                            {item}: {detail.status === 'available' ? 'Tersedia' : 'Terbatas'}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-5 pt-0 space-y-2">
+                                        {/* GOOGLE MAPS DIRECT NAVIGATION LINK */}
+                                        <a 
+                                            href={`https://www.google.com/maps/dir/?api=1&destination=${kiosk.lat},${kiosk.lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="w-full bg-primary hover:bg-primary-dark text-white font-bold text-xs py-2.5 rounded-xl flex items-center justify-center space-x-2 transition-all shadow-sm"
+                                        >
+                                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                                            </svg>
+                                            <span>Buka Rute Google Maps</span>
+                                        </a>
+
+                                        {/* WHATSAPP CONTACT BUTTON */}
+                                        {kiosk.whatsapp && (
+                                            <a 
+                                                href={`https://wa.me/${kiosk.whatsapp}?text=Halo%20${encodeURIComponent(kiosk.name)},%20saya%20ingin%20menanyakan%20ketersediaan%20stok%20pupuk/benih`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold text-xs py-2 rounded-xl flex items-center justify-center space-x-1.5 transition-all"
+                                            >
+                                                <span>Chat WhatsApp Kios</span>
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- SECTION: COMMUNITY VIEW ---
+        function CommunityView({ contributions, newContribution, setNewContribution, handleAddContribution }) {
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-darktext tracking-tight">Komunitas & Kontribusi Petani Sumenep</h1>
+                        <p className="text-sm text-muted mt-1">Berbagi pengalaman lapangan, laporan pengamatan hama, dan tips praktis antar sesama petani.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* FORM KONTRIBUSI */}
+                        <div className="bg-surface p-6 rounded-3xl border border-bordercolor shadow-sm space-y-4 h-fit">
+                            <h2 className="text-lg font-bold text-darktext">Kirim Artikel / Tips Anda</h2>
+                            
+                            <form onSubmit={handleAddContribution} className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-darktext">Nama / Asal Kecamatan:</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Contoh: Pak Hassan (Lenteng)"
+                                        value={newContribution.author}
+                                        onChange={(e) => setNewContribution({ ...newContribution, author: e.target.value })}
+                                        className="w-full bg-background border border-bordercolor p-2.5 rounded-xl text-xs focus:outline-none focus:border-primary"
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-darktext">Judul Tulisan / Pengalaman:</label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Judul singkat..."
+                                        value={newContribution.title}
+                                        onChange={(e) => setNewContribution({ ...newContribution, title: e.target.value })}
+                                        className="w-full bg-background border border-bordercolor p-2.5 rounded-xl text-xs focus:outline-none focus:border-primary"
+                                    />
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-darktext">Kategori:</label>
+                                    <select 
+                                        value={newContribution.category}
+                                        onChange={(e) => setNewContribution({ ...newContribution, category: e.target.value })}
+                                        className="w-full bg-background border border-bordercolor p-2.5 rounded-xl text-xs focus:outline-none focus:border-primary"
+                                    >
+                                        <option value="Budidaya">Pengalaman Budidaya</option>
+                                        <option value="Hama">Laporan Hama & Penyakit</option>
+                                        <option value="Tips">Tips Hemat Pupuk</option>
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-darktext">Isi Penjelasan / Catatan:</label>
+                                    <textarea 
+                                        rows="4" 
+                                        placeholder="Tuliskan pengalaman atau saran Anda..."
+                                        value={newContribution.content}
+                                        onChange={(e) => setNewContribution({ ...newContribution, content: e.target.value })}
+                                        className="w-full bg-background border border-bordercolor p-2.5 rounded-xl text-xs focus:outline-none focus:border-primary"
+                                    ></textarea>
+                                </div>
+
+                                <button 
+                                    type="submit"
+                                    className="w-full bg-primary hover:bg-primary-dark text-white font-bold text-xs py-3 rounded-xl transition-all shadow-sm"
+                                >
+                                    Kirimkan Kontribusi
+                                </button>
+                            </form>
+                        </div>
+
+                        {/* LIST KONTRIBUSI */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <h2 className="text-lg font-bold text-darktext">Diskusi & Kiriman Terbaru</h2>
+
+                            <div className="space-y-4">
+                                {contributions.map(item => (
+                                    <div key={item.id} className="bg-surface p-6 rounded-3xl border border-bordercolor shadow-sm space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center space-x-2">
+                                                <span className="w-8 h-8 rounded-full bg-emerald-100 text-primary font-bold flex items-center justify-center text-xs">
+                                                    {item.author.charAt(0)}
+                                                </span>
+                                                <div>
+                                                    <h4 className="font-bold text-sm text-darktext">{item.author}</h4>
+                                                    <span className="text-[10px] text-muted">{item.date}</span>
+                                                </div>
+                                            </div>
+
+                                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                                                item.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                                            }`}>
+                                                {item.status === 'approved' ? 'Terverifikasi' : 'Menunggu Moderasi Admin'}
+                                            </span>
+                                        </div>
+
+                                        <h3 className="font-bold text-base text-darktext">{item.title}</h3>
+                                        <p className="text-xs text-muted leading-relaxed whitespace-pre-line">{item.content}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- SECTION: DASHBOARD PEMILIK KIOS & ADMIN VIEW ---
+        function DashboardView({ kiosks, setKiosks, showToast }) {
+            const [selectedKioskId, setSelectedKioskId] = useState(kiosks[0]?.id || '');
+            const activeKiosk = kiosks.find(k => k.id === selectedKioskId) || kiosks[0];
+
+            const handleToggleStock = (productName) => {
+                const updatedKiosks = kiosks.map(k => {
+                    if (k.id === activeKiosk.id) {
+                        const currentStatus = k.stocks[productName]?.status || 'available';
+                        const newStatus = currentStatus === 'available' ? 'out_of_stock' : 'available';
+                        return {
+                            ...k,
+                            stocks: {
+                                ...k.stocks,
+                                [productName]: {
+                                    ...k.stocks[productName],
+                                    status: newStatus,
+                                    updated: 'Baru saja'
+                                }
+                            }
+                        };
+                    }
+                    return k;
+                });
+                setKiosks(updatedKiosks);
+                showToast(`Status stok ${productName} berhasil diperbarui.`);
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-darktext tracking-tight">Dashboard Pengelolaan Kios Pertanian</h1>
+                        <p className="text-sm text-muted mt-1">Panel pemilik kios untuk memperbarui ketersediaan pupuk dan informasi operasional secara mandiri.</p>
+                    </div>
+
+                    <div className="bg-surface p-6 rounded-3xl border border-bordercolor shadow-sm space-y-6">
+                        {/* SELECT KIOSK TO MANAGE */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-bordercolor pb-6">
+                            <div>
+                                <label className="text-xs font-bold text-darktext uppercase tracking-wider block mb-1">Pilih Kios yang Dikelola:</label>
+                                <select 
+                                    value={selectedKioskId}
+                                    onChange={(e) => setSelectedKioskId(e.target.value)}
+                                    className="bg-background border border-bordercolor rounded-xl px-4 py-2.5 text-xs font-bold text-darktext focus:outline-none focus:border-primary"
+                                >
+                                    {kiosks.map(k => (
+                                        <option key={k.id} value={k.id}>{k.name} ({k.district})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="flex items-center space-x-2 text-xs text-muted">
+                                <span>Status Verifikasi Kios:</span>
+                                <span className="bg-emerald-100 text-emerald-800 font-extrabold px-2.5 py-1 rounded-full text-[10px]">TERVERIFIKASI</span>
+                            </div>
+                        </div>
+
+                        {/* MANAGE STOCKS */}
+                        <div className="space-y-4">
+                            <h3 className="font-bold text-base text-darktext">Kelola Stok Produk ({activeKiosk?.name})</h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {Object.entries(activeKiosk?.stocks || {}).map(([product, data]) => (
+                                    <div key={product} className="bg-background p-4 rounded-2xl border border-bordercolor flex items-center justify-between">
+                                        <div>
+                                            <h4 className="font-bold text-sm text-darktext">{product}</h4>
+                                            <span className="text-[10px] text-muted">Terakhir diperbarui: {data.updated}</span>
+                                        </div>
+
+                                        <button 
+                                            onClick={() => handleToggleStock(product)}
+                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                                data.status === 'available'
+                                                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                                    : 'bg-red-500 text-white hover:bg-red-600'
+                                            }`}
+                                        >
+                                            {data.status === 'available' ? 'Tersedia' : 'Habis'}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- RENDER REACT APP ---
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
